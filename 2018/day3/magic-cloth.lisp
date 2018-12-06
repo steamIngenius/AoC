@@ -41,10 +41,7 @@
 (defun find-claim (rects)
   (loop for line in rects do
        (if (parse-rect 'claimp line)
-           (format t "answer: ~a~%" line)
-           )
-       )
-  )
+           (format t "answer: ~a~%" line))))
 
 (with-open-file (input "input.txt")
   (when input
