@@ -9,58 +9,43 @@
    (not (char= a b))))
 
 (defun react (chain)
-    (let ((reaction-occurred nil)
-          (skip nil))
-      (loop for unit across chain
-            for i from 0
-            with end = (1- (length chain))
-            if (and (not skip)
-                    (< i end)
-                    (not (reaction unit (elt chain (1+ i)))))
-              collect unit
-            else do
-              (cond (skip (setf skip nil))
-                    ((< i (1- (length chain))) nil)
-                    (t (when (reaction unit (elt chain (1+ i)))
-                         (setf reaction-occurred t)
-                         (setf skip t)))))))
+  (if (< (length chain) 20) (format t "~a~%" chain))
+  (do ((index 0 (1+ index))
+       (reacting nil)
+       (reaction-occurred nil)
+       (newchain (make-array 0 :fill-pointer 0 :adjustable t)))
+      ((>= index (- (length chain) 1))
+       (if (not reacting)
+           (vector-push-extend (elt chain index) newchain))
+       (if reaction-occurred
+           (react newchain)
+           chain))
+    (cond ((not reacting)
+           (setf reacting (reaction (elt chain index) (elt chain (1+ index))))
+           (if reacting (setf reaction-occurred t)
+               (vector-push-extend (elt chain index) newchain)))
+          (reacting
+           (setf reacting nil)))))
 
 (with-open-file (input "input.txt")
   (when input
     (setf (getf *polymer* :raw) (read-line input nil))
-    (format t "~a~%" (length (getf *polymer* :raw)))
-    (format t "~a~%" (length (react (getf *polymer* :raw))))
-    ;; (loop for c in *alphabet*
-    ;;       with polymer = ""
-    ;;       collect (list :char c :polymer polymer))
-    ))
 
-;; grab a char
-;; if there was a reaction
-;;   reset reaction flag and discard char
-;; otherwise
-;;   check to see if a reaction happens with this char and the next
-;; reaction yes
-;;   set flag and discard this char
-;; reaction no
-;;   collect
+    (format t "The answer for part 1 is: ~a~%"
+            (length (react (getf *polymer* :raw))))
 
+    (format t "Improving polymers...")
+    (setf (getf *polymer* :processed)
+          (loop for c in *alphabet*
+                collect (list
+                         :char c
+                         :polymer (react (remove c (getf *polymer* :raw) :test #'char-equal)))))
+    (setf (getf *polymer* :processed)
+          (sort (getf *polymer* :processed)
+                #'<
+                :key (lambda (plist)
+                       (length (getf plist :polymer)))))
+    (format t "done.~%")
+    (format t "The answer for part two is: ~a~%"
+            (length (getf (first (getf *polymer* :processed)) :polymer)))))
 
-
-;; (defun react (chain)
-;;   (loop named react do
-;;     (let ((reaction-occurred nil))
-;;       (loop for unit across chain
-;;             for i from 0 do
-;;               (when (and (< i (1- (length chain)))
-;;                          (reaction unit (elt chain (1+ i))))
-;;                 (setf reaction-occurred t)
-;;                 (setf (char chain i) #\*)
-;;                 (setf (char chain (1+ i)) #\*)))
-;;       (if reaction-occurred
-;;           (progn
-;;             (format t ".")
-;;             (setf (getf *polymer* :raw) (remove #\* chain))
-;;             (setf reaction-occurred nil))
-;;           (return-from react))))
-;;   )
