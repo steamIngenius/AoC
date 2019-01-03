@@ -9,7 +9,6 @@
    (not (char= a b))))
 
 (defun react (chain)
-  (if (< (length chain) 20) (format t "~a~%" chain))
   (do ((index 0 (1+ index))
        (reacting nil)
        (reaction-occurred nil)
