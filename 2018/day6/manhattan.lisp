@@ -1,6 +1,8 @@
 (defparameter *height* 0)
 (defparameter *width* 0)
 (defparameter *destinations* ())
+(defparameter *exclusions* (make-hash-table))
+(defparameter *areas* (make-hash-table))
 
 (defun split (str chr)
   "Returns a list of substrings of str split by chr"
@@ -17,87 +19,63 @@
    'parse-integer
    (split-by-space (remove #\Comma raw))))
 
+(format t "Reading coordinates.~%")
 (with-open-file (input "input.txt")
   (when input
     (loop for line = (read-line input nil)
-          while line do (push (parse-location line) *destinations*))))
+          for id from 0
+          while line do (push (cons id (parse-location line)) *destinations*))))
 
-(loop for (x y) in *destinations*
+(loop for (nil x y) in *destinations*
       do
          (setf *height* (max x *height*))
          (setf *width* (max y *width*)))
+(defparameter *map* (make-array (* *height* *width*) :initial-element (list :id nil :proximity 0)))
 
-(defparameter *map* (make-array (* *height* *width*) :initial-element 0))
+(defun add-to-map (x y id proximity)
+  (setf (elt *map* (+ x (* y *width*)))
+        (list :id id :proximity proximity)))
 
+(defun get-xy (x y)
+  (elt *map* (+ x (* y *width*))))
 
-;; --- Day 6: Chronal Coordinates ---
+(defun proximity (p1 p2)
+  "Returns the manhattan distance between two points."
+  (destructuring-bind ((x1 y1) (x2 y2)) (list p1 p2)
+    (+ (abs (- x2 x1)) (abs (- y2 y1)))))
 
-;; The device on your wrist beeps several times, and once again you
-;; feel like you're falling.
+(format t "Mapping proximities...")
+(do ((x 0 (+ x 1)))
+    ((>= x *width*))
+  (do ((y 0 (+ y 1)))
+      ((>= y *height*))
+    (loop for (id dx dy) in *destinations* do
+      (let ((p (proximity (list dx dy) (list x y)))
+            (current (get-xy x y)))
+        (cond ((or (< p (getf current :proximity))
+                   (= p 0)
+                   (not (getf current :id)))
+               (add-to-map x y id p))
+              ((= p (getf current :proximity)) (add-to-map x y "." p)))))))
+(format t "done.~%")
 
-;; "Situation critical," the device announces. "Destination
-;; indeterminate. Chronal interference detected. Please specify new
-;; target coordinates."
+;; calculate areas, identify 'infinite' areas and add to exclusions
+(do ((x 0 (+ x 1)))
+    ((>= x *width*))
+  (do ((y 0 (+ y 1)))
+      ((>= y *height*))
+    (if (or (= x 0)
+            (= x (- *width* 1))
+            (= y 0)
+            (= y (- *height* 1)))
+        (setf (gethash (getf (get-xy x y) :id) *exclusions*) t)
+        (multiple-value-bind (value present) (gethash (getf (get-xy x y) :id) *areas*)
+          (declare (ignore value))
+          (if present
+              (incf (gethash (getf (get-xy x y) :id) *areas*))
+              (setf (gethash (getf (get-xy x y) :id) *areas*) 1))))))
 
-;; The device then produces a list of coordinates (your puzzle input).
-;; Are they places it thinks are safe or dangerous? It recommends you
-;; check manual page 729. The Elves did not give you a manual.
+;; find the largest area, ignore exclusions
+(defparameter *largest* 0)
+(maphash #'(lambda (k v) (if (gethash k *exclusions*) () (setf *largest* (max *largest* v)))) *areas*)
 
-;; If they're dangerous, maybe you can minimize the danger by finding
-;; the coordinate that gives the largest distance from the other points.
-
-;; Using only the Manhattan distance, determine the area around each
-;; coordinate by counting the number of integer X,Y locations that are
-;; closest to that coordinate (and aren't tied in distance to any other
-;; coordinate).
-
-;; Your goal is to find the size of the largest area that isn't
-;; infinite. For example, consider the following list of coordinates:
-
-;; 1, 1
-;; 1, 6
-;; 8, 3
-;; 3, 4
-;; 5, 5
-;; 8, 9
-
-;; If we name these coordinates A through F, we can draw them on a
-;; grid, putting 0,0 at the top left:
-
-;; ..........
-;; .A........
-;; ..........
-;; ........C.
-;; ...D......
-;; .....E....
-;; .B........
-;; ..........
-;; ..........
-;; ........F.
-
-;; This view is partial - the actual grid extends infinitely in all
-;; directions. Using the Manhattan distance, each location's closest
-;; coordinate can be determined, shown here in lowercase:
-
-;; aaaaa.cccc
-;; aAaaa.cccc
-;; aaaddecccc
-;; aadddeccCc
-;; ..dDdeeccc
-;; bb.deEeecc
-;; bBb.eeee..
-;; bbb.eeefff
-;; bbb.eeffff
-;; bbb.ffffFf
-
-;; Locations shown as . are equally far from two or more coordinates,
-;; and so they don't count as being closest to any.
-
-;; In this example, the areas of coordinates A, B, C, and F are
-;; infinite - while not shown here, their areas extend forever outside
-;; the visible grid. However, the areas of coordinates D and E are
-;; finite: D is closest to 9 locations, and E is closest to 17 (both
-;; including the coordinate's location itself). Therefore, in this
-;; example, the size of the largest area is 17.
-
-;; What is the size of the largest area that isn't infinite?
